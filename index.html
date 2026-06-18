@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Compound Growth Calculator</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #0a0f1a; font-family: 'Segoe UI', system-ui, sans-serif; color: #e2e8f0; min-height: 100vh; }
+
+    /* Header */
+    .header { background: linear-gradient(135deg,#0f172a,#1e293b); border-bottom: 1px solid #1e293b; padding: 24px 20px 18px; }
+    .header-label { font-size: 10px; letter-spacing: .15em; color: #64748b; text-transform: uppercase; margin-bottom: 5px; }
+    .header h1 { font-size: 24px; font-weight: 700; color: #f1f5f9; line-height: 1.2; }
+    .header h1 span { color: #34d399; }
+    .header p { margin-top: 6px; font-size: 12px; color: #64748b; }
+
+    /* Controls */
+    .controls { padding: 18px 20px; background: #0d1526; border-bottom: 1px solid #1e293b; }
+    .controls-label { font-size: 10px; letter-spacing: .12em; color: #475569; text-transform: uppercase; margin-bottom: 12px; }
+    .slider-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px,1fr)); gap: 16px; }
+
+    /* Slider */
+    .slider-wrap { display: flex; flex-direction: column; }
+    .slider-header { display: flex; justify-content: space-between; margin-bottom: 7px; }
+    .slider-label { font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: .06em; }
+    .slider-value { font-size: 13px; font-weight: 700; }
+    .slider-track { position: relative; height: 20px; display: flex; align-items: center; }
+    .slider-bg { position: absolute; left: 0; right: 0; height: 4px; background: #1e293b; border-radius: 2px; }
+    .slider-fill { position: absolute; left: 0; height: 4px; border-radius: 2px; pointer-events: none; transition: width .1s; }
+    input[type=range] { position: relative; width: 100%; appearance: none; background: transparent; cursor: pointer; height: 20px; z-index: 1; }
+    input[type=range]::-webkit-slider-thumb { appearance: none; width: 18px; height: 18px; border-radius: 50%; border: 2px solid #0a0f1a; }
+    input[type=range]::-moz-range-thumb    { width: 18px; height: 18px; border-radius: 50%; border: 2px solid #0a0f1a; }
+
+    /* Custom box */
+    .custom-box { margin-top: 18px; background: #0a0f1a; border: 1.5px solid #831843; border-radius: 14px; padding: 16px 18px; }
+    .custom-box-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+    .custom-dot { width: 10px; height: 10px; border-radius: 50%; background: #ec4899; box-shadow: 0 0 8px #ec489988; flex-shrink: 0; }
+    .custom-title { font-size: 11px; color: #f472b6; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
+    .name-btn { background: transparent; border: 1px dashed #475569; border-radius: 6px; color: #94a3b8; font-size: 13px; font-weight: 600; padding: 3px 10px; cursor: pointer; display: flex; align-items: center; gap: 5px; }
+    .name-input { background: #1e293b; border: 1px solid #ec4899; border-radius: 6px; color: #f1f5f9; font-size: 13px; font-weight: 600; padding: 3px 8px; width: 160px; outline: none; }
+    .presets { margin-top: 12px; }
+    .presets-label { font-size: 10px; color: #475569; letter-spacing: .1em; text-transform: uppercase; margin-bottom: 7px; }
+    .preset-btns { display: flex; flex-wrap: wrap; gap: 6px; }
+    .preset-btn { font-size: 12px; padding: 4px 12px; border-radius: 20px; cursor: pointer; transition: all .15s; font-family: inherit; }
+    .rate-context { margin-top: 12px; font-size: 12px; color: #64748b; line-height: 1.5; }
+
+    /* Results */
+    .results { padding: 18px 20px; }
+    .cards-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(155px,1fr)); gap: 10px; margin-bottom: 16px; }
+    .card { border-radius: 14px; padding: 14px 14px 12px; position: relative; overflow: hidden; background: linear-gradient(135deg,#111827,#0f1f2e); }
+    .card-top-bar { position: absolute; top: 0; left: 0; right: 0; height: 3px; border-radius: 14px 14px 0 0; }
+    .card-custom-badge { position: absolute; top: 8px; right: 8px; font-size: 9px; padding: 1px 6px; border-radius: 10px; background: #500724; color: #f472b6; font-weight: 700; }
+    .card-name { font-size: 10px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; margin-bottom: 5px; }
+    .card-fv { font-size: 26px; font-weight: 800; color: #f1f5f9; line-height: 1; margin-bottom: 3px; }
+    .card-rate { font-size: 11px; color: #475569; }
+    .card-breakdown { margin-top: 9px; display: flex; gap: 6px; }
+    .card-breakdown-item { flex: 1; }
+    .card-breakdown-label { font-size: 10px; color: #475569; margin-bottom: 1px; }
+    .card-breakdown-value { font-size: 12px; font-weight: 600; }
+    .card-bar-track { margin-top: 9px; height: 4px; background: #1e293b; border-radius: 2px; overflow: hidden; }
+    .card-bar-fill { height: 100%; border-radius: 2px; transition: width .4s; }
+
+    /* Callout */
+    .callout { margin-bottom: 14px; padding: 12px 16px; border-radius: 12px; font-size: 13px; line-height: 1.6; }
+
+    /* Table */
+    .table-wrap { background: #0d1526; border: 1px solid #1e293b; border-radius: 14px; overflow: hidden; }
+    .table-head { padding: 12px 18px 10px; border-bottom: 1px solid #1e293b; font-size: 11px; font-weight: 600; color: #94a3b8; letter-spacing: .06em; text-transform: uppercase; }
+    .table-scroll { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    th { padding: 9px 10px; font-weight: 600; white-space: nowrap; }
+    td { padding: 10px 10px; white-space: nowrap; }
+    th:first-child, td:first-child { padding-left: 14px; }
+    tr { border-bottom: 1px solid #1e293b; }
+    tr:last-child { border-bottom: none; }
+    tbody tr:nth-child(even) { background: #0a1220; }
+
+    /* Insight */
+    .insight { margin-top: 12px; padding: 13px 16px; background: #0d2218; border: 1px solid #064e3b; border-radius: 12px; font-size: 13px; color: #6ee7b7; line-height: 1.6; }
+    .insight strong.green { color: #34d399; }
+    .insight strong.pink  { color: #f472b6; }
+    .insight strong.white { color: #f1f5f9; }
+  </style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <div class="header-label">Compound Growth Calculator</div>
+  <h1>Watch your money <span>work for you</span></h1>
+  <p>Dial in your numbers — including your own custom return rate.</p>
+</div>
+
+<!-- Controls -->
+<div class="controls">
+  <div class="controls-label">Your investment inputs</div>
+  <div class="slider-grid">
+    <div class="slider-wrap">
+      <div class="slider-header">
+        <span class="slider-label">Monthly contribution</span>
+        <span class="slider-value" id="val-monthly" style="color:#34d399">$100/mo</span>
+      </div>
+      <div class="slider-track">
+        <div class="slider-bg"></div>
+        <div class="slider-fill" id="fill-monthly" style="background:#34d399"></div>
+        <input type="range" id="s-monthly" min="25" max="2000" step="25" value="100" style="--c:#34d399">
+      </div>
+    </div>
+    <div class="slider-wrap">
+      <div class="slider-header">
+        <span class="slider-label">One-time lump sum</span>
+        <span class="slider-value" id="val-lump" style="color:#60a5fa">None</span>
+      </div>
+      <div class="slider-track">
+        <div class="slider-bg"></div>
+        <div class="slider-fill" id="fill-lump" style="background:#60a5fa"></div>
+        <input type="range" id="s-lump" min="0" max="50000" step="500" value="0">
+      </div>
+    </div>
+    <div class="slider-wrap">
+      <div class="slider-header">
+        <span class="slider-label">Starting age</span>
+        <span class="slider-value" id="val-start" style="color:#f59e0b">25 yrs</span>
+      </div>
+      <div class="slider-track">
+        <div class="slider-bg"></div>
+        <div class="slider-fill" id="fill-start" style="background:#f59e0b"></div>
+        <input type="range" id="s-start" min="18" max="60" step="1" value="25">
+      </div>
+    </div>
+    <div class="slider-wrap">
+      <div class="slider-header">
+        <span class="slider-label">Retirement age</span>
+        <span class="slider-value" id="val-retire" style="color:#f59e0b">65 yrs · 40yr horizon</span>
+      </div>
+      <div class="slider-track">
+        <div class="slider-bg"></div>
+        <div class="slider-fill" id="fill-retire" style="background:#f59e0b"></div>
+        <input type="range" id="s-retire" min="30" max="80" step="1" value="65">
+      </div>
+    </div>
+  </div>
+
+  <!-- Custom rate -->
+  <div class="custom-box">
+    <div class="custom-box-header">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div class="custom-dot"></div>
+        <span class="custom-title">Custom scenario</span>
+      </div>
+      <div id="name-toggle-wrap">
+        <button class="name-btn" id="name-btn" onclick="toggleNameEdit()">
+          <span id="name-display">My Scenario</span>
+          <span style="font-size:10px;color:#64748b">✏️ rename</span>
+        </button>
+        <input class="name-input" id="name-input" value="My Scenario" style="display:none"
+          onblur="saveName()" onkeydown="if(event.key==='Enter')saveName()" maxlength="22">
+      </div>
+    </div>
+
+    <div class="slider-wrap">
+      <div class="slider-header">
+        <span class="slider-label">Annual return rate</span>
+        <span class="slider-value" id="val-rate" style="color:#ec4899">14% / yr</span>
+      </div>
+      <div class="slider-track">
+        <div class="slider-bg"></div>
+        <div class="slider-fill" id="fill-rate" style="background:#ec4899"></div>
+        <input type="range" id="s-rate" min="1" max="30" step="0.5" value="14">
+      </div>
+    </div>
+
+    <div class="presets">
+      <div class="presets-label">Quick presets</div>
+      <div class="preset-btns" id="preset-btns">
+        <!-- filled by JS -->
+      </div>
+    </div>
+    <div class="rate-context" id="rate-context"></div>
+  </div>
+</div>
+
+<!-- Results -->
+<div class="results">
+  <div class="cards-grid" id="cards"></div>
+  <div id="callout"></div>
+  <div class="table-wrap">
+    <div class="table-head">Growth milestones</div>
+    <div class="table-scroll"><table id="milestones-table"></table></div>
+  </div>
+  <div class="insight" id="insight"></div>
+</div>
+
+<script>
+  const BASE = [
+    { label:"CD / Bond",          rate:3,  color:"#94a3b8", bar:"#64748b", fixed:true  },
+    { label:"Conservative Index", rate:7,  color:"#60a5fa", bar:"#3b82f6", fixed:true  },
+    { label:"S&P 500 Avg",        rate:10, color:"#34d399", bar:"#10b981", fixed:true  },
+  ];
+  const PRESETS = [4,6,8,12,14,18,20];
+
+  let monthly=100, lump=0, startAge=25, retireAge=65, customRate=14, customName="My Scenario";
+
+  function calcFV(mo, rate, yrs) {
+    if (rate===0) return mo*12*yrs;
+    const r = rate/100/12, n = yrs*12;
+    return mo * ((Math.pow(1+r,n)-1)/r) * (1+r);
+  }
+  function fmt(n) {
+    if (n>=1e6) return "$"+(n/1e6).toFixed(2)+"M";
+    return "$"+Math.round(n).toLocaleString();
+  }
+  function fmtFull(n){ return "$"+Math.round(n).toLocaleString(); }
+
+  function pct(v,mn,mx){ return Math.round((v-mn)/(mx-mn)*100); }
+
+  function updateSliderFill(fillId, inputEl){
+    const fill = document.getElementById(fillId);
+    fill.style.width = pct(inputEl.value, inputEl.min, inputEl.max)+"%";
+  }
+
+  function stylePresets(){
+    document.getElementById("preset-btns").innerHTML = PRESETS.map(r=>`
+      <button class="preset-btn" onclick="setRate(${r})" style="
+        border:${customRate===r?"1.5px solid #ec4899":"1px solid #334155"};
+        background:${customRate===r?"#500724":"#1e293b"};
+        color:${customRate===r?"#f472b6":"#64748b"};
+        font-weight:${customRate===r?700:400};">${r}%</button>
+    `).join("");
+  }
+
+  function rateContext(r){
+    if(r<=4)  return "💰 Conservative — similar to high-yield savings or short-term bonds.";
+    if(r<=7)  return "📊 Moderate — typical bond fund or balanced portfolio range.";
+    if(r<=11) return "📈 Aggressive — close to long-term S&P 500 historical average.";
+    if(r<=16) return "🚀 Optimistic — possible with growth stocks or a strong decade, but above historical norms.";
+    return "⚡ Very aggressive — rare and difficult to sustain long-term. Use for best-case scenario modeling.";
+  }
+
+  function setRate(r){
+    customRate = r;
+    const s = document.getElementById("s-rate");
+    s.value = r;
+    document.getElementById("val-rate").textContent = r+"% / yr";
+    updateSliderFill("fill-rate", s);
+    stylePresets();
+    document.getElementById("rate-context").textContent = rateContext(r);
+    render();
+  }
+
+  function toggleNameEdit(){
+    document.getElementById("name-btn").style.display="none";
+    const inp = document.getElementById("name-input");
+    inp.style.display="inline-block";
+    inp.focus();
+  }
+  function saveName(){
+    const inp = document.getElementById("name-input");
+    customName = inp.value.trim() || "My Scenario";
+    inp.value = customName;
+    document.getElementById("name-display").textContent = customName;
+    document.getElementById("name-btn").style.display="flex";
+    inp.style.display="none";
+    render();
+  }
+
+  function scenarios(){
+    return [...BASE, { label:customName, rate:customRate, color:"#f472b6", bar:"#ec4899", fixed:false }];
+  }
+
+  function render(){
+    const yrs = Math.max(1, retireAge-startAge);
+    const scens = scenarios();
+    const results = scens.map(s=>{
+      const fv = calcFV(monthly,s.rate,yrs) + lump*Math.pow(1+s.rate/100,yrs);
+      const contrib = monthly*12*yrs + lump;
+      return { ...s, fv, contrib, growth: fv-contrib };
+    });
+    const maxFV = Math.max(...results.map(r=>r.fv));
+    const sp = results[2], custom = results[3];
+
+    // Cards
+    document.getElementById("cards").innerHTML = results.map(r=>`
+      <div class="card" style="border:1.5px solid ${r.bar}33">
+        <div class="card-top-bar" style="background:${r.bar}"></div>
+        ${!r.fixed?`<div class="card-custom-badge">CUSTOM</div>`:""}
+        <div class="card-name" style="color:${r.color}">${r.label}</div>
+        <div class="card-fv">${fmt(r.fv)}</div>
+        <div class="card-rate">${r.rate}% / yr</div>
+        <div class="card-breakdown">
+          <div class="card-breakdown-item">
+            <div class="card-breakdown-label">You put in</div>
+            <div class="card-breakdown-value" style="color:#94a3b8">${fmt(r.contrib)}</div>
+          </div>
+          <div class="card-breakdown-item">
+            <div class="card-breakdown-label">Market added</div>
+            <div class="card-breakdown-value" style="color:${r.color}">${fmt(r.growth)}</div>
+          </div>
+        </div>
+        <div class="card-bar-track">
+          <div class="card-bar-fill" style="background:${r.bar};width:${Math.min(100,(r.fv/maxFV)*100)}%"></div>
+        </div>
+      </div>
+    `).join("");
+
+    // Callout
+    if(customRate!==10){
+      const up = custom.fv>sp.fv;
+      document.getElementById("callout").innerHTML = `
+        <div class="callout" style="background:${up?"#0d2218":"#1c0a24"};border:1px solid ${up?"#064e3b":"#581c87"};color:${up?"#6ee7b7":"#d8b4fe"}">
+          ${up?"📈":"📉"} <strong style="color:${up?"#34d399":"#a855f7"}">Your ${customRate}% vs S&P 500 (10%):</strong>
+          After ${yrs} years, the difference is <strong style="color:#f1f5f9">${fmtFull(Math.abs(custom.fv-sp.fv))}</strong>
+          ${up?" more in your custom scenario — but remember, higher returns usually mean higher risk."
+              :" less than the S&P 500 average. Even small differences compound dramatically over time."}
+        </div>`;
+    } else {
+      document.getElementById("callout").innerHTML="";
+    }
+
+    // Milestone table
+    const milestones = [5,10,20,30].filter(y=>y<=yrs);
+    if(!milestones.includes(yrs)) milestones.push(yrs);
+
+    const thead = `<thead><tr style="border-bottom:1px solid #1e293b;text-align:left">
+      <th style="color:#475569;font-weight:500">Year</th>
+      <th style="color:#475569;font-weight:500">Age</th>
+      <th style="color:#475569;font-weight:500">Invested</th>
+      ${scens.map(s=>`<th style="color:${s.color};text-align:right">${s.fixed?s.label:customName} (${s.rate}%)</th>`).join("")}
+    </tr></thead>`;
+
+    const tbody = "<tbody>"+milestones.map((y,i)=>{
+      const contrib = monthly*12*y+lump;
+      return `<tr style="${i%2===1?"background:#0a1220":""}">
+        <td style="color:#94a3b8;font-weight:600">${y} yrs</td>
+        <td style="color:#64748b">${startAge+y}</td>
+        <td style="color:#64748b">${fmtFull(contrib)}</td>
+        ${scens.map(s=>{
+          const fv = calcFV(monthly,s.rate,y)+lump*Math.pow(1+s.rate/100,y);
+          const mult = contrib>0?(fv/contrib).toFixed(1):"—";
+          return `<td style="text-align:right"><span style="color:${s.color};font-weight:700">${fmtFull(fv)}</span><span style="font-size:10px;color:#475569;margin-left:4px">(${mult}x)</span></td>`;
+        }).join("")}
+      </tr>`;
+    }).join("")+"</tbody>";
+
+    document.getElementById("milestones-table").innerHTML = thead+tbody;
+
+    // Insight
+    const totalContrib = monthly*12*yrs+lump;
+    document.getElementById("insight").innerHTML = `
+      <strong class="green">💡 Key insight:</strong> You'll contribute
+      <strong class="white">${fmtFull(totalContrib)}</strong> over ${yrs} years.
+      At S&P 500 average, the market adds <strong class="green">${fmtFull(sp.growth)}</strong>.
+      At your custom ${customRate}%, it adds <strong class="pink">${fmtFull(custom.growth)}</strong>.
+      The longer you wait to start, the more you give up.`;
+  }
+
+  // Wire up sliders
+  function wire(sliderId, fillId, min, max, onVal, onInput){
+    const s = document.getElementById(sliderId);
+    const update = ()=>{
+      updateSliderFill(fillId, s);
+      onVal(Number(s.value));
+      onInput && onInput();
+      render();
+    };
+    s.addEventListener("input", update);
+    updateSliderFill(fillId, s);
+  }
+
+  wire("s-monthly","fill-monthly",25,2000, v=>{
+    monthly=v;
+    document.getElementById("val-monthly").textContent="$"+v.toLocaleString()+"/mo";
+  });
+  wire("s-lump","fill-lump",0,50000, v=>{
+    lump=v;
+    document.getElementById("val-lump").textContent=v===0?"None":"$"+v.toLocaleString();
+  });
+  wire("s-start","fill-start",18,60, v=>{
+    startAge=Math.min(v,retireAge-1);
+    document.getElementById("s-start").value=startAge;
+    updateSliderFill("fill-start",document.getElementById("s-start"));
+    document.getElementById("val-start").textContent=startAge+" yrs";
+  });
+  wire("s-retire","fill-retire",30,80, v=>{
+    retireAge=Math.max(v,startAge+1);
+    document.getElementById("s-retire").value=retireAge;
+    updateSliderFill("fill-retire",document.getElementById("s-retire"));
+    const yrs=retireAge-startAge;
+    document.getElementById("val-retire").textContent=retireAge+" yrs · "+yrs+"yr horizon";
+  });
+
+  document.getElementById("s-rate").addEventListener("input",function(){
+    customRate=Number(this.value);
+    document.getElementById("val-rate").textContent=customRate+"% / yr";
+    updateSliderFill("fill-rate",this);
+    stylePresets();
+    document.getElementById("rate-context").textContent=rateContext(customRate);
+    render();
+  });
+
+  // Style thumb color per slider via injected CSS
+  const thumbCSS = [
+    ["s-monthly","#34d399"],["s-lump","#60a5fa"],
+    ["s-start","#f59e0b"],["s-retire","#f59e0b"],["s-rate","#ec4899"]
+  ].map(([id,c])=>`
+    #${id}::-webkit-slider-thumb { background:${c}; box-shadow:0 0 6px ${c}88; }
+    #${id}::-moz-range-thumb    { background:${c}; }
+  `).join("");
+  document.head.insertAdjacentHTML("beforeend","<style>"+thumbCSS+"</style>");
+
+  // Init
+  stylePresets();
+  document.getElementById("rate-context").textContent=rateContext(customRate);
+  render();
+</script>
+</body>
+</html>
