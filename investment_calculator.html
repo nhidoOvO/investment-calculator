@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Compound Growth Calculator</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #0a0f1a; font-family: 'DM Sans', 'Segoe UI', sans-serif; color: #e2e8f0; }
+    input[type=range] { width: 100%; appearance: none; background: transparent; cursor: pointer; height: 20px; }
+    input[type=range]::-webkit-slider-thumb { appearance: none; width: 18px; height: 18px; border-radius: 50%; border: 2px solid #0a0f1a; }
+    input[type=range]::-moz-range-thumb { width: 18px; height: 18px; border-radius: 50%; border: 2px solid #0a0f1a; }
+    table { border-collapse: collapse; width: 100%; }
+    ::-webkit-scrollbar { height: 4px; width: 4px; } 
+    ::-webkit-scrollbar-track { background: #1e293b; }
+    ::-webkit-scrollbar-thumb { background: #475569; border-radius: 2px; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useMemo } = React;
+
+    const BASE_SCENARIOS = [
+      { label: "CD / Bond",           rate: 3,  color: "#94a3b8", barColor: "#64748b", fixed: true },
+      { label: "Conservative Index",  rate: 7,  color: "#60a5fa", barColor: "#3b82f6", fixed: true },
+      { label: "S&P 500 Avg",         rate: 10, color: "#34d399", barColor: "#10b981", fixed: true },
+    ];
+    const CUSTOM_PRESETS = [4, 6, 8, 12, 14, 18, 20];
+
+    function calcFV(monthly, rate, years) {
+      if (rate === 0) return monthly * 12 * years;
+      const r = rate / 100 / 12;
+      const n = years * 12;
+      return monthly * ((Math.pow(1 + r, n) - 1) / r) * (1 + r);
+    }
+
+    function fmt(n) {
+      if (n >= 1_000_000) return "$" + (n / 1_000_000).toFixed(2) + "M";
+      return "$" + Math.round(n).toLocaleString();
+    }
+    function fmtFull(n) { return "$" + Math.round(n).toLocaleString(); }
+
+    function Slider({ label, value, min, max, step, display, onChange, accent }) {
+      const pct = ((value - min) / (max - min)) * 100;
+      return (
+        <div>
+          <div style={{ display:"flex", justifyContent:"space-between", marginBottom:7 }}>
+            <span style={{ fontSize:11, color:"#64748b", textTransform:"uppercase", letterSpacing:"0.06em" }}>{label}</span>
+            <span style={{ fontSize:13, fontWeight:700, color:accent }}>{display}</span>
+          </div>
+          <div style={{ position:"relative", height:20, display:"flex", alignItems:"center" }}>
+            <div style={{ position:"absolute", left:0, right:0, height:4, background:"#1e293b", borderRadius:2 }} />
+            <div style={{ position:"absolute", left:0, height:4, width:pct+"%", background:accent, borderRadius:2, transition:"width 0.1s" }} />
+            <input type="range" min={min} max={max} step={step} value={value}
+              onChange={e => onChange(Number(e.target.value))}
+              style={{ position:"relative", background:"transparent", cursor:"pointer", height:20 }}
+            />
+          </div>
+          <style>{`
+            input[type=range]::-webkit-slider-thumb { background: ${accent} !important; box-shadow: 0 0 6px ${accent}88; }
+            input[type=range]::-moz-range-thumb    { background: ${accent} !important; }
+          `}</style>
+        </div>
+      );
+    }
+
+    function App() {
+      const [monthly,    setMonthly]    = useState(100);
+      const [startAge,   setStartAge]   = useState(25);
+      const [retireAge,  setRetireAge]  = useState(65);
+      const [lumpSum,    setLumpSum]    = useState(0);
+      const [customRate, setCustomRate] = useState(14);
+      const [customName, setCustomName] = useState("My Scenario");
+      const [editingName,setEditingName]= useState(false);
+
+      const years = Math.max(1, retireAge - startAge);
+
+      const scenarios = useMemo(() => [
+        ...BASE_SCENARIOS,
+        { label: customName, rate: customRate, color: "#f472b6", barColor: "#ec4899", fixed: false },
+      ], [customName, customRate]);
+
+      const results = useMemo(() =>
+        scenarios.map(s => {
+          const fv = calcFV(monthly, s.rate, years) + lumpSum * Math.pow(1 + s.rate / 100, years);
+          const contributed = monthly * 12 * years + lumpSum;
+          const growth = fv - contributed;
+          return { ...s, fv, contributed, growth };
+        }), [scenarios, monthly, years, lumpSum]);
+
+      const milestones = [5, 10, 20, 30].filter(y => y <= years);
+      if (!milestones.includes(years) && years > 0) milestones.push(years);
+      const maxFV = Math.max(...results.map(r => r.fv));
+      const customResult = results[3];
+
+      const rateContext =
+        customRate <= 4  ? "💰 Conservative — similar to high-yield savings or short-term bonds." :
+        customRate <= 7  ? "📊 Moderate — typical bond fund or balanced portfolio range." :
+        customRate <= 11 ? "📈 Aggressive — close to long-term S&P 500 historical average." :
+        customRate <= 16 ? "🚀 Optimistic — possible with growth stocks or a strong decade, but above historical norms." :
+                           "⚡ Very aggressive — rare and difficult to sustain long-term. Use for best-case scenario modeling.";
+
+      return (
+        <div style={{ minHeight:"100vh", background:"#0a0f1a" }}>
+
+          {/* ── Header ── */}
+          <div style={{ background:"linear-gradient(135deg,#0f172a,#1e293b)", borderBottom:"1px solid #1e293b", padding:"24px 20px 18px" }}>
+            <div style={{ fontSize:10, letterSpacing:"0.15em", color:"#64748b", textTransform:"uppercase", marginBottom:5 }}>Compound Growth Calculator</div>
+            <h1 style={{ fontSize:24, fontWeight:700, color:"#f1f5f9", lineHeight:1.2 }}>
+              Watch your money <span style={{ color:"#34d399" }}>work for you</span>
+            </h1>
+            <p style={{ marginTop:6, fontSize:12, color:"#64748b" }}>Dial in your numbers — including your own custom return rate.</p>
+          </div>
+
+          {/* ── Controls ── */}
+          <div style={{ padding:"18px 20px", background:"#0d1526", borderBottom:"1px solid #1e293b" }}>
+            <div style={{ fontSize:10, letterSpacing:"0.12em", color:"#475569", textTransform:"uppercase", marginBottom:12 }}>Your investment inputs</div>
+            <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(190px,1fr))", gap:16 }}>
+              <Slider label="Monthly contribution" value={monthly} min={25} max={2000} step={25}
+                display={"$"+monthly.toLocaleString()+"/mo"} onChange={setMonthly} accent="#34d399" />
+              <Slider label="One-time lump sum" value={lumpSum} min={0} max={50000} step={500}
+                display={lumpSum===0?"None":"$"+lumpSum.toLocaleString()} onChange={setLumpSum} accent="#60a5fa" />
+              <Slider label="Starting age" value={startAge} min={18} max={60} step={1}
+                display={startAge+" yrs"} onChange={v=>setStartAge(Math.min(v,retireAge-1))} accent="#f59e0b" />
+              <Slider label="Retirement age" value={retireAge} min={30} max={80} step={1}
+                display={retireAge+" yrs · "+years+" yr horizon"}
+                onChange={v=>setRetireAge(Math.max(v,startAge+1))} accent="#f59e0b" />
+            </div>
+
+            {/* Custom rate box */}
+            <div style={{ marginTop:18, background:"#0a0f1a", border:"1.5px solid #831843", borderRadius:14, padding:"16px 18px" }}>
+              <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:14, flexWrap:"wrap", gap:8 }}>
+                <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                  <div style={{ width:10, height:10, borderRadius:"50%", background:"#ec4899", boxShadow:"0 0 8px #ec489988" }} />
+                  <span style={{ fontSize:11, color:"#f472b6", fontWeight:600, letterSpacing:"0.08em", textTransform:"uppercase" }}>Custom scenario</span>
+                </div>
+                {editingName ? (
+                  <input autoFocus value={customName}
+                    onChange={e=>setCustomName(e.target.value.slice(0,22))}
+                    onBlur={()=>setEditingName(false)}
+                    onKeyDown={e=>e.key==="Enter"&&setEditingName(false)}
+                    style={{ background:"#1e293b", border:"1px solid #ec4899", borderRadius:6, color:"#f1f5f9", fontSize:13, fontWeight:600, padding:"3px 8px", width:160, outline:"none" }}
+                  />
+                ) : (
+                  <button onClick={()=>setEditingName(true)}
+                    style={{ background:"transparent", border:"1px dashed #475569", borderRadius:6, color:"#94a3b8", fontSize:13, fontWeight:600, padding:"3px 10px", cursor:"pointer" }}>
+                    {customName} <span style={{ fontSize:10, color:"#64748b" }}>✏️ rename</span>
+                  </button>
+                )}
+              </div>
+
+              <Slider label="Annual return rate" value={customRate} min={1} max={30} step={0.5}
+                display={customRate+"% / yr"} onChange={setCustomRate} accent="#ec4899" />
+
+              <div style={{ marginTop:12 }}>
+                <div style={{ fontSize:10, color:"#475569", letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:7 }}>Quick presets</div>
+                <div style={{ display:"flex", flexWrap:"wrap", gap:6 }}>
+                  {CUSTOM_PRESETS.map(r => (
+                    <button key={r} onClick={()=>setCustomRate(r)} style={{
+                      fontSize:12, padding:"4px 12px", borderRadius:20, cursor:"pointer",
+                      border: customRate===r ? "1.5px solid #ec4899" : "1px solid #334155",
+                      background: customRate===r ? "#500724" : "#1e293b",
+                      color: customRate===r ? "#f472b6" : "#64748b",
+                      fontWeight: customRate===r ? 700 : 400,
+                    }}>{r}%</button>
+                  ))}
+                </div>
+              </div>
+              <div style={{ marginTop:12, fontSize:12, color:"#64748b", lineHeight:1.5 }}>{rateContext}</div>
+            </div>
+          </div>
+
+          {/* ── Result cards ── */}
+          <div style={{ padding:"18px 20px" }}>
+            <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(155px,1fr))", gap:10, marginBottom:16 }}>
+              {results.map(r => (
+                <div key={r.label} style={{ background:"linear-gradient(135deg,#111827,#0f1f2e)", border:`1.5px solid ${r.barColor}33`, borderRadius:14, padding:"14px 14px 12px", position:"relative", overflow:"hidden" }}>
+                  <div style={{ position:"absolute", top:0, left:0, right:0, height:3, background:r.barColor, borderRadius:"14px 14px 0 0" }} />
+                  {!r.fixed && <div style={{ position:"absolute", top:8, right:8, fontSize:9, padding:"1px 6px", borderRadius:10, background:"#500724", color:"#f472b6", fontWeight:700 }}>CUSTOM</div>}
+                  <div style={{ fontSize:10, color:r.color, fontWeight:600, letterSpacing:"0.08em", textTransform:"uppercase", marginBottom:5 }}>{r.label}</div>
+                  <div style={{ fontSize:26, fontWeight:800, color:"#f1f5f9", lineHeight:1, marginBottom:3 }}>{fmt(r.fv)}</div>
+                  <div style={{ fontSize:11, color:"#475569" }}>{r.rate}% / yr</div>
+                  <div style={{ marginTop:9, display:"flex", gap:6 }}>
+                    <div style={{ flex:1 }}>
+                      <div style={{ fontSize:10, color:"#475569", marginBottom:1 }}>You put in</div>
+                      <div style={{ fontSize:12, color:"#94a3b8", fontWeight:600 }}>{fmt(r.contributed)}</div>
+                    </div>
+                    <div style={{ flex:1 }}>
+                      <div style={{ fontSize:10, color:"#475569", marginBottom:1 }}>Market added</div>
+                      <div style={{ fontSize:12, color:r.color, fontWeight:600 }}>{fmt(r.growth)}</div>
+                    </div>
+                  </div>
+                  <div style={{ marginTop:9, height:4, background:"#1e293b", borderRadius:2, overflow:"hidden" }}>
+                    <div style={{ height:"100%", borderRadius:2, background:r.barColor, width:`${Math.min(100,(r.fv/maxFV)*100)}%`, transition:"width 0.4s" }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Custom vs S&P callout */}
+            {customRate !== 10 && (
+              <div style={{ marginBottom:14, padding:"12px 16px", background:customRate>10?"#0d2218":"#1c0a24", border:`1px solid ${customRate>10?"#064e3b":"#581c87"}`, borderRadius:12, fontSize:13, color:customRate>10?"#6ee7b7":"#d8b4fe", lineHeight:1.6 }}>
+                {customRate>10?"📈":"📉"} <strong style={{ color:customRate>10?"#34d399":"#a855f7" }}>Your {customRate}% vs S&P 500 (10%): </strong>
+                After {years} years, the difference is <strong style={{ color:"#f1f5f9" }}>{fmtFull(Math.abs(customResult.fv-results[2].fv))}</strong>{" "}
+                {customResult.fv>results[2].fv
+                  ? "more in your custom scenario — but remember, higher returns usually mean higher risk."
+                  : "less than the S&P 500 average. Even small differences compound dramatically over time."}
+              </div>
+            )}
+
+            {/* Milestone table */}
+            <div style={{ background:"#0d1526", border:"1px solid #1e293b", borderRadius:14, overflow:"hidden" }}>
+              <div style={{ padding:"12px 18px 10px", borderBottom:"1px solid #1e293b" }}>
+                <div style={{ fontSize:11, fontWeight:600, color:"#94a3b8", letterSpacing:"0.06em", textTransform:"uppercase" }}>Growth milestones</div>
+              </div>
+              <div style={{ overflowX:"auto" }}>
+                <table style={{ fontSize:12 }}>
+                  <thead>
+                    <tr style={{ borderBottom:"1px solid #1e293b" }}>
+                      <th style={{ padding:"9px 14px", textAlign:"left", color:"#475569", fontWeight:500, whiteSpace:"nowrap" }}>Year</th>
+                      <th style={{ padding:"9px 10px", textAlign:"left", color:"#475569", fontWeight:500, whiteSpace:"nowrap" }}>Age</th>
+                      <th style={{ padding:"9px 10px", textAlign:"left", color:"#475569", fontWeight:500, whiteSpace:"nowrap" }}>Invested</th>
+                      {scenarios.map(s => (
+                        <th key={s.label} style={{ padding:"9px 10px", textAlign:"right", color:s.color, fontWeight:600, whiteSpace:"nowrap" }}>
+                          {s.fixed?s.label:customName} ({s.rate}%)
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {milestones.map((y,i) => {
+                      const contributed = monthly*12*y + lumpSum;
+                      return (
+                        <tr key={y} style={{ borderBottom:i<milestones.length-1?"1px solid #1e293b":"none", background:i%2===0?"transparent":"#0a1220" }}>
+                          <td style={{ padding:"10px 14px", color:"#94a3b8", fontWeight:600 }}>{y} yrs</td>
+                          <td style={{ padding:"10px 10px", color:"#64748b" }}>{startAge+y}</td>
+                          <td style={{ padding:"10px 10px", color:"#64748b" }}>{fmtFull(contributed)}</td>
+                          {scenarios.map(s => {
+                            const fv = calcFV(monthly, s.rate, y) + lumpSum*Math.pow(1+s.rate/100, y);
+                            const mult = contributed>0 ? (fv/contributed).toFixed(1) : "—";
+                            return (
+                              <td key={s.label} style={{ padding:"10px 10px", textAlign:"right" }}>
+                                <span style={{ color:s.color, fontWeight:700 }}>{fmtFull(fv)}</span>
+                                <span style={{ fontSize:10, color:"#475569", marginLeft:4 }}>({mult}x)</span>
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Insight */}
+            <div style={{ marginTop:12, padding:"13px 16px", background:"#0d2218", border:"1px solid #064e3b", borderRadius:12, fontSize:13, color:"#6ee7b7", lineHeight:1.6 }}>
+              <strong style={{ color:"#34d399" }}>💡 Key insight:</strong> You'll contribute{" "}
+              <strong style={{ color:"#f1f5f9" }}>{fmtFull(monthly*12*years+lumpSum)}</strong> over {years} years.
+              At S&P 500 average, the market adds <strong style={{ color:"#34d399" }}>{fmtFull(results[2].growth)}</strong>.
+              At your custom {customRate}%, it adds <strong style={{ color:"#f472b6" }}>{fmtFull(customResult.growth)}</strong>.{" "}
+              The longer you wait to start, the more you give up.
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById("root"));
+    root.render(<App />);
+  </script>
+</body>
+</html>
